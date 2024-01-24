@@ -1,1 +1,1 @@
-from teenygrad.tensor import Tensor            # noqa: F401
+from teenygrad.tensor import Tensor  # noqa: F401
