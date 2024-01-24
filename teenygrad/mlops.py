@@ -327,7 +327,20 @@ class Where(Function):
 
 
 class Sum(Function):
+    """
+    This class represents the sum operation in a computational graph.
 
+    Attributes:
+        input_shape (Tuple[int, ...]): The shape of the input tensor.
+
+    Methods:
+        forward(x: LazyBuffer, new_shape: Tuple[int, ...]) -> LazyBuffer:
+            Performs the forward pass of the sum operation.
+
+        backward(grad_output: LazyBuffer) -> LazyBuffer:
+            Performs the backward pass of the sum operation.
+
+    """
     def forward(self, x: LazyBuffer, new_shape: Tuple[int, ...]) -> LazyBuffer:
         self.input_shape = x.shape
         return x.r(ReduceOps.SUM, new_shape)
@@ -377,6 +390,17 @@ class Max(Function):
 
 # NOTE: this is sum in reverse
 class Expand(Function):
+    """
+    Expand function for lazy buffer expansion.
+
+    Args:
+        x (LazyBuffer): The input buffer.
+        shape (Tuple[int, ...]): The desired shape for expansion.
+
+    Returns:
+        LazyBuffer: The expanded buffer.
+
+    """
 
     def forward(self, x: LazyBuffer, shape: Tuple[int, ...]) -> LazyBuffer:
         self.input_shape = x.shape
@@ -387,6 +411,17 @@ class Expand(Function):
 
 
 class Reshape(Function):
+    """
+    Reshape function for modifying the shape of a tensor.
+
+    Args:
+        x (LazyBuffer): The input tensor.
+        shape (Tuple[int, ...]): The desired shape of the tensor.
+
+    Returns:
+        LazyBuffer: The reshaped tensor.
+
+    """
 
     def forward(self, x: LazyBuffer, shape: Tuple[int, ...]) -> LazyBuffer:
         self.input_shape = x.shape
@@ -397,6 +432,16 @@ class Reshape(Function):
 
 
 class Permute(Function):
+    """
+    A custom function to perform permutation on a LazyBuffer object.
+
+    Args:
+        x (LazyBuffer): The input LazyBuffer object.
+        order (Tuple[int, ...]): The desired order of dimensions.
+
+    Returns:
+        LazyBuffer: The permuted LazyBuffer object.
+    """
 
     def forward(self, x: LazyBuffer, order: Tuple[int, ...]) -> LazyBuffer:
         self.input_order = order
@@ -407,6 +452,17 @@ class Permute(Function):
 
 
 class Pad(Function):
+    """
+    Pad function for extending the dimensions of a tensor.
+
+    Args:
+        x (LazyBuffer): The input tensor.
+        arg (Tuple[Tuple[int, int], ...]): The padding dimensions for each axis.
+
+    Returns:
+        LazyBuffer: The padded tensor.
+
+    """
 
     def forward(self, x: LazyBuffer, arg: Tuple[Tuple[int, int],
                                                 ...]) -> LazyBuffer:
@@ -418,6 +474,24 @@ class Pad(Function):
 
 
 class Shrink(Function):
+    """
+    Shrink function performs element-wise shrink operation on the input tensor.
+
+    Args:
+        x (LazyBuffer): The input tensor.
+        arg (Tuple[Tuple[sint, sint], ...]): The shrink parameters for each dimension of the input tensor.
+
+    Returns:
+        LazyBuffer: The output tensor after applying the shrink operation.
+
+    Raises:
+        AssertionError: If the shrink parameters are not integers.
+
+    Notes:
+        - The shrink operation reduces the size of the tensor along each dimension by the specified amount.
+        - The backward operation is not supported for symbolic shrink.
+
+    """
 
     def forward(self, x: LazyBuffer, arg: Tuple[Tuple[sint, sint],
                                                 ...]) -> LazyBuffer:
@@ -433,6 +507,17 @@ class Shrink(Function):
 
 
 class Flip(Function):
+    """
+    This class represents a flip operation along specified axes.
+
+    Args:
+        x (LazyBuffer): The input tensor.
+        axis (Tuple[int, ...]): The axes along which to flip the tensor.
+
+    Returns:
+        LazyBuffer: The flipped tensor.
+
+    """
 
     def forward(self, x: LazyBuffer, axis: Tuple[int, ...]) -> LazyBuffer:
         self.arg = tuple(
