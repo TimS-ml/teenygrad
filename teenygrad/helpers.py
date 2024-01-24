@@ -8,37 +8,118 @@ OSX = platform.system() == "Darwin"
 
 
 def dedup(x):
-    return list(dict.fromkeys(x))  # retains list orderi
+    """
+    Remove duplicate elements from a list while preserving the order.
+
+    Args:
+        x: The input list.
+
+    Returns:
+        A new list with duplicate elements removed.
+    """
+    return list(dict.fromkeys(x))
 
 
 def argfix(*x):
+    """
+    Fix the argument format.
+
+    If the first argument is a tuple or list, it is returned as is.
+    Otherwise, the arguments are returned as a tuple.
+
+    Args:
+        *x: Variable number of arguments.
+
+    Returns:
+        A tuple if the first argument is not a tuple or list, otherwise the first argument itself.
+    """
     return tuple(x[0]) if x and x[0].__class__ in (tuple, list) else x
 
 
 def make_pair(x: Union[int, Tuple[int, ...]], cnt=2) -> Tuple[int, ...]:
+    """
+    Create a pair or tuple of the given value.
+
+    If the input is an integer, it is repeated `cnt` times to create a tuple.
+    If the input is already a tuple, it is returned as is.
+
+    Args:
+        x: The input value.
+        cnt: The number of times to repeat the input value. Default is 2.
+
+    Returns:
+        A tuple containing the input value repeated `cnt` times.
+    """
     return (x, ) * cnt if isinstance(x, int) else x
 
 
 def flatten(l: Iterator):
+    """
+    Flatten a nested list.
+
+    Args:
+        l: The nested list.
+
+    Returns:
+        A flattened list.
+    """
     return [item for sublist in l for item in sublist]
 
 
 def argsort(x):
+    """
+    Sort the indices of a list based on the corresponding values.
+
+    Args:
+        x: The input list.
+
+    Returns:
+        A new list containing the sorted indices.
+    """
     return type(x)(
         sorted(range(len(x)), key=x.__getitem__)
-    )  # https://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python
+    )
 
 
 def all_int(t: Tuple[Any, ...]) -> bool:
+    """
+    Check if all elements in a tuple are integers.
+
+    Args:
+        t: The input tuple.
+
+    Returns:
+        True if all elements are integers, False otherwise.
+    """
     return all(isinstance(s, int) for s in t)
 
 
 def round_up(num, amt: int):
+    """
+    Round up a number to the nearest multiple of a given amount.
+
+    Args:
+        num: The input number.
+        amt: The amount to round up to.
+
+    Returns:
+        The rounded up number.
+    """
     return (num + amt - 1) // amt * amt
 
 
 @functools.lru_cache(maxsize=None)
 def getenv(key, default=0):
+    """
+    Get the value of an environment variable.
+
+    Args:
+        key: The name of the environment variable.
+        default: The default value to return if the environment variable is not set. Default is 0.
+
+    Returns:
+        The value of the environment variable, or the default value if it is not set.
+    """
     return type(default)(os.getenv(key, default))
 
 
@@ -48,11 +129,20 @@ CI = os.getenv("CI", "") != ""
 
 @dataclass(frozen=True, order=True)
 class DType:
-    priority: int  # this determines when things get upcasted
+    """
+    Represents a data type.
+
+    Attributes:
+        priority: The priority of the data type.
+        itemsize: The size of each item in the data type.
+        name: The name of the data type.
+        np: The corresponding NumPy data type. (Optional)
+        sz: The size of the data type. Default is 1.
+    """
+    priority: int
     itemsize: int
     name: str
-    np: Optional[
-        type]  # TODO: someday this will be removed with the "remove numpy" project
+    np: Optional[type]
     sz: int = 1
 
     def __repr__(self):
@@ -60,22 +150,79 @@ class DType:
 
 
 class dtypes:
+    """
+    Contains predefined data types.
 
-    @staticmethod  # static methds on top, or bool in the type info will refer to dtypes.bool
+    Attributes:
+        bool: The boolean data type.
+        float16: The 16-bit floating-point data type.
+        half: Alias for float16.
+        float32: The 32-bit floating-point data type.
+        float: Alias for float32.
+        float64: The 64-bit floating-point data type.
+        double: Alias for float64.
+        int8: The 8-bit integer data type.
+        int16: The 16-bit integer data type.
+        int32: The 32-bit integer data type.
+        int64: The 64-bit integer data type.
+        uint8: The 8-bit unsigned integer data type.
+        uint16: The 16-bit unsigned integer data type.
+        uint32: The 32-bit unsigned integer data type.
+        uint64: The 64-bit unsigned integer data type.
+        bfloat16: The 16-bit brain floating-point data type.
+    """
+
+    @staticmethod
     def is_int(x: DType) -> bool:
+        """
+        Check if a data type is an integer.
+
+        Args:
+            x: The data type.
+
+        Returns:
+            True if the data type is an integer, False otherwise.
+        """
         return x in (dtypes.int8, dtypes.int16, dtypes.int32, dtypes.int64,
                      dtypes.uint8, dtypes.uint16, dtypes.uint32, dtypes.uint64)
 
     @staticmethod
     def is_float(x: DType) -> bool:
+        """
+        Check if a data type is a floating-point number.
+
+        Args:
+            x: The data type.
+
+        Returns:
+            True if the data type is a floating-point number, False otherwise.
+        """
         return x in (dtypes.float16, dtypes.float32, dtypes.float64)
 
     @staticmethod
     def is_unsigned(x: DType) -> bool:
+        """
+        Check if a data type is unsigned.
+
+        Args:
+            x: The data type.
+
+        Returns:
+            True if the data type is unsigned, False otherwise.
+        """
         return x in (dtypes.uint8, dtypes.uint16, dtypes.uint32, dtypes.uint64)
 
     @staticmethod
     def from_np(x) -> DType:
+        """
+        Get the corresponding DType object for a given NumPy data type.
+
+        Args:
+            x: The NumPy data type.
+
+        Returns:
+            The corresponding DType object.
+        """
         return DTYPES_DICT[np.dtype(x).name]
 
     bool: Final[DType] = DType(0, 1, "bool", np.bool_)

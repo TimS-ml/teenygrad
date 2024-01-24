@@ -8,6 +8,15 @@ from teenygrad.shape.symbolic import sint
 
 
 class Contiguous(Function):
+    """
+    A function that ensures the input tensor is contiguous.
+
+    Args:
+        x (LazyBuffer): The input tensor.
+
+    Returns:
+        LazyBuffer: The contiguous tensor.
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
         return x.contiguous()
@@ -17,6 +26,20 @@ class Contiguous(Function):
 
 
 class ContiguousBackward(Function):
+    """
+    A class representing the backward operation for contiguous tensors.
+
+    This class inherits from the Function class and provides the implementation
+    for the backward operation. The backward operation takes the gradient of the
+    output tensor with respect to the input tensor and returns the gradient of the
+    input tensor.
+
+    Args:
+        x (LazyBuffer): The input tensor.
+
+    Returns:
+        LazyBuffer: The gradient of the input tensor.
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
         return x
@@ -26,6 +49,18 @@ class ContiguousBackward(Function):
 
 
 class Cast(Function):
+    """
+    This class represents a cast operation in the computation graph.
+
+    Args:
+        x (LazyBuffer): The input buffer to be casted.
+        dtype (DType): The target data type for the cast operation.
+        bitcast (bool, optional): Whether to perform a bitcast operation. Defaults to False.
+
+    Returns:
+        LazyBuffer: The casted buffer.
+
+    """
 
     def forward(self,
                 x: LazyBuffer,
@@ -139,12 +174,32 @@ class Sigmoid(Function):
 
 
 class Less(Function):
+    """
+    Performs element-wise less-than comparison between two tensors.
+
+    Args:
+        x (LazyBuffer): The first input tensor.
+        y (LazyBuffer): The second input tensor.
+
+    Returns:
+        LazyBuffer: A tensor containing the result of the element-wise less-than comparison.
+    """
 
     def forward(self, x: LazyBuffer, y: LazyBuffer) -> LazyBuffer:
         return x.e(BinaryOps.CMPLT, y)
 
 
 class Add(Function):
+    """
+    A function that performs element-wise addition of two tensors.
+
+    Args:
+        x (LazyBuffer): The first input tensor.
+        y (LazyBuffer): The second input tensor.
+
+    Returns:
+        LazyBuffer: The result of element-wise addition of x and y.
+    """
 
     def forward(self, x: LazyBuffer, y: LazyBuffer) -> LazyBuffer:
         return x.e(BinaryOps.ADD, y)
@@ -157,6 +212,19 @@ class Add(Function):
 
 
 class Sub(Function):
+    """
+    Subtraction function.
+
+    This function performs element-wise subtraction between two input tensors.
+
+    Args:
+        x (LazyBuffer): The first input tensor.
+        y (LazyBuffer): The second input tensor.
+
+    Returns:
+        LazyBuffer: The result of element-wise subtraction between x and y.
+
+    """
 
     def forward(self, x: LazyBuffer, y: LazyBuffer) -> LazyBuffer:
         return x.e(BinaryOps.SUB, y)
@@ -169,6 +237,13 @@ class Sub(Function):
 
 
 class Mul(Function):
+    """
+    This class represents the multiplication operation in the computation graph.
+
+    Attributes:
+        x (LazyBuffer): The first input tensor.
+        y (LazyBuffer): The second input tensor.
+    """
 
     def forward(self, x: LazyBuffer, y: LazyBuffer) -> LazyBuffer:
         self.x, self.y = x, y
@@ -182,6 +257,13 @@ class Mul(Function):
 
 
 class Div(Function):
+    """
+    A class representing the division operation.
+
+    Attributes:
+        x (LazyBuffer): The first input tensor.
+        y (LazyBuffer): The second input tensor.
+    """
 
     def forward(self, x: LazyBuffer, y: LazyBuffer) -> LazyBuffer:
         self.x, self.y = x, y
@@ -190,23 +272,52 @@ class Div(Function):
     def backward(
         self, grad_output: LazyBuffer
     ) -> Tuple[Optional[LazyBuffer], Optional[LazyBuffer]]:
-        return grad_output.e(BinaryOps.DIV, self.y) if self.needs_input_grad[0] else None, \
-               grad_output.e(UnaryOps.NEG).e(BinaryOps.MUL, self.x).e(BinaryOps.DIV, self.y.e(BinaryOps.MUL, self.y)) if self.needs_input_grad[1] else None
+        return (
+            grad_output.e(BinaryOps.DIV, self.y) if self.needs_input_grad[0] else None,
+            grad_output.e(UnaryOps.NEG)
+            .e(BinaryOps.MUL, self.x)
+            .e(BinaryOps.DIV, self.y.e(BinaryOps.MUL, self.y))
+            if self.needs_input_grad[1]
+            else None,
+        )
 
 
 # ************* ternary ops *************
 
 
 class Where(Function):
+    """
+    This class represents the Where function, which performs element-wise conditional selection.
+    """
 
     def forward(self, x: LazyBuffer, y: LazyBuffer,
                 z: LazyBuffer) -> LazyBuffer:
+        """
+        Forward pass of the Where function.
+
+        Args:
+            x (LazyBuffer): The input tensor.
+            y (LazyBuffer): The tensor to select from when the condition is True.
+            z (LazyBuffer): The tensor to select from when the condition is False.
+
+        Returns:
+            LazyBuffer: The result of the element-wise conditional selection.
+        """
         self.x = x
         return x.e(TernaryOps.WHERE, y, z)
 
     def backward(
         self, grad_output: LazyBuffer
     ) -> Tuple[None, Optional[LazyBuffer], Optional[LazyBuffer]]:
+        """
+        Backward pass of the Where function.
+
+        Args:
+            grad_output (LazyBuffer): The gradient of the output.
+
+        Returns:
+            Tuple[None, Optional[LazyBuffer], Optional[LazyBuffer]]: The gradients of the input tensors.
+        """
         return None, \
                self.x.e(TernaryOps.WHERE, grad_output, grad_output.const(0)) if self.needs_input_grad[1] else None, \
                self.x.e(TernaryOps.WHERE, grad_output.const(0), grad_output) if self.needs_input_grad[2] else None
@@ -226,6 +337,24 @@ class Sum(Function):
 
 
 class Max(Function):
+    """
+    Computes the maximum value along a specified dimension of a LazyBuffer.
+
+    Args:
+        x (LazyBuffer): The input LazyBuffer.
+        new_shape (Tuple[int, ...]): The new shape of the LazyBuffer after the maximum operation.
+
+    Returns:
+        LazyBuffer: The LazyBuffer containing the maximum values along the specified dimension.
+
+    Examples:
+        >>> x = LazyBuffer([1, 2, 3, 4, 5])
+        >>> new_shape = (2, 2)
+        >>> max_op = Max()
+        >>> result = max_op.forward(x, new_shape)
+        >>> print(result)
+        LazyBuffer([3, 5])
+    """
 
     def forward(self, x: LazyBuffer, new_shape: Tuple[int, ...]) -> LazyBuffer:
         self.x, self.ret = x, x.r(ReduceOps.MAX, new_shape)

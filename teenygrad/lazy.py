@@ -5,15 +5,63 @@ import numpy as np
 
 
 class RawCPUBuffer:
+    """
+    Represents a raw CPU buffer.
+
+    Attributes:
+    - x: The raw CPU buffer.
+
+    Methods:
+    - toCPU(): Returns the raw CPU buffer.
+    """
 
     def __init__(self, x):
         self.x = x
 
     def toCPU(self):
+        """
+        Returns the raw CPU buffer.
+
+        Returns:
+        - The raw CPU buffer.
+        """
         return self.x
 
 
 class LazyBuffer:
+    """
+    Represents a lazy buffer.
+
+    Attributes:
+    - device: The device of the buffer.
+    - _np: The underlying numpy array.
+
+    Properties:
+    - base: Returns the base buffer.
+    - dtype: Returns the data type of the buffer.
+    - realized: Returns the realized buffer.
+    - shape: Returns the shape of the buffer.
+
+    Methods:
+    - __repr__(): Returns a string representation of the buffer.
+    - schedule(seen=None): Returns the schedule of the buffer.
+    - is_unrealized_contiguous_const(): Checks if the buffer is an unrealized contiguous constant.
+    - copy_to_device(device: str) -> LazyBuffer: Copies the buffer to the specified device.
+    - fromCPU(x): Creates a lazy buffer from a CPU buffer.
+    - loadop(op, shape, dtype, device, arg=None, src=None) -> LazyBuffer: Creates a lazy buffer using a load operation.
+    - contiguous(x): Returns the contiguous buffer.
+    - const(x) -> LazyBuffer: Creates a constant buffer.
+    - cast(dtype: DType, bitcast: bool = False): Casts the buffer to the specified data type.
+    - e(op, *srcs: LazyBuffer): Performs an element-wise operation on the buffer.
+    - r(op, new_shape): Performs a reduction operation on the buffer.
+    - reshape(arg): Reshapes the buffer.
+    - expand(arg): Expands the buffer.
+    - shrink(arg): Shrinks the buffer.
+    - permute(arg): Permutes the buffer.
+    - pad(arg): Pads the buffer.
+    - stride(arg): Applies strides to the buffer.
+    """
+
     device = "CPU"
 
     def __init__(self, buf: np.ndarray):
@@ -21,38 +69,115 @@ class LazyBuffer:
 
     @property
     def base(self):
+        """
+        Returns the base buffer.
+
+        Returns:
+        - The base buffer.
+        """
         return self
 
     @property
     def dtype(self):
+        """
+        Returns the data type of the buffer.
+
+        Returns:
+        - The data type of the buffer.
+        """
         return dtypes.from_np(self._np.dtype)
 
     @property
     def realized(self):
+        """
+        Returns the realized buffer.
+
+        Returns:
+        - The realized buffer.
+        """
         return RawCPUBuffer(self._np)
 
     @property
     def shape(self):
+        """
+        Returns the shape of the buffer.
+
+        Returns:
+        - The shape of the buffer.
+        """
         return self._np.shape
 
     def __repr__(self):
+        """
+        Returns a string representation of the buffer.
+
+        Returns:
+        - A string representation of the buffer.
+        """
         return f"<LB {self.shape} {self.dtype}>"
 
     def schedule(self, seen=None):
+        """
+        Returns the schedule of the buffer.
+
+        Parameters:
+        - seen: A set of already seen buffers (default: None).
+
+        Returns:
+        - The schedule of the buffer.
+        """
         return []
 
     def is_unrealized_contiguous_const(self):
+        """
+        Checks if the buffer is an unrealized contiguous constant.
+
+        Returns:
+        - True if the buffer is an unrealized contiguous constant, False otherwise.
+        """
         return False
 
     def copy_to_device(self, device: str) -> LazyBuffer:
+        """
+        Copies the buffer to the specified device.
+
+        Parameters:
+        - device: The device to copy the buffer to.
+
+        Returns:
+        - The copied buffer.
+        """
         return self
 
     @staticmethod
     def fromCPU(x):
+        """
+        Creates a lazy buffer from a CPU buffer.
+
+        Parameters:
+        - x: The CPU buffer.
+
+        Returns:
+        - The lazy buffer.
+        """
         return LazyBuffer(x)
 
     @staticmethod
     def loadop(op, shape, dtype, device, arg=None, src=None) -> LazyBuffer:
+        """
+        Creates a lazy buffer using a load operation.
+
+        Parameters:
+        - op: The load operation.
+        - shape: The shape of the buffer.
+        - dtype: The data type of the buffer.
+        - device: The device of the buffer.
+        - arg: The argument for the load operation (default: None).
+        - src: The source buffer for the load operation (default: None).
+
+        Returns:
+        - The lazy buffer.
+        """
         if op == LoadOps.RAND:
             return LazyBuffer(
                 np.random.default_rng(arg).random(size=shape, dtype=dtype.np))
@@ -64,16 +189,54 @@ class LazyBuffer:
             raise NotImplementedError(op)
 
     def contiguous(x):
+        """
+        Returns the contiguous buffer.
+
+        Parameters:
+        - x: The buffer.
+
+        Returns:
+        - The contiguous buffer.
+        """
         return x
 
     def const(self, x) -> LazyBuffer:
+        """
+        Creates a constant buffer.
+
+        Parameters:
+        - x: The constant value.
+
+        Returns:
+        - The constant buffer.
+        """
         return LazyBuffer(np.full_like(self._np, x))
 
     def cast(self, dtype: DType, bitcast: bool = False):
+        """
+        Casts the buffer to the specified data type.
+
+        Parameters:
+        - dtype: The data type to cast to.
+        - bitcast: Whether to perform a bitcast (default: False).
+
+        Returns:
+        - The casted buffer.
+        """
         return LazyBuffer(
             self._np.view(dtype.np) if bitcast else self._np.astype(dtype.np))
 
     def e(self, op, *srcs: LazyBuffer):
+        """
+        Performs an element-wise operation on the buffer.
+
+        Parameters:
+        - op: The element-wise operation.
+        - srcs: The source buffers.
+
+        Returns:
+        - The result buffer.
+        """
         if DEBUG >= 1: print(op, self, srcs)
         if op == UnaryOps.NEG: ret = -self._np
         elif op == UnaryOps.EXP2: ret = np.exp2(self._np)
@@ -96,6 +259,16 @@ class LazyBuffer:
                        copy=False))
 
     def r(self, op, new_shape):
+        """
+        Performs a reduction operation on the buffer.
+
+        Parameters:
+        - op: The reduction operation.
+        - new_shape: The new shape of the buffer.
+
+        Returns:
+        - The result buffer.
+        """
         if DEBUG >= 1: print(op, self, new_shape)
         assert len(self.shape) == len(
             new_shape), "reduce shapes must have same dimensions"
@@ -111,20 +284,74 @@ class LazyBuffer:
 
     # MovementOps
     def reshape(self, arg):
+        """
+        Reshapes the buffer.
+
+        Parameters:
+        - arg: The new shape.
+
+        Returns:
+        - The reshaped buffer.
+        """
         return LazyBuffer(self._np.reshape(arg))
 
     def expand(self, arg):
+        """
+        Expands the buffer.
+
+        Parameters:
+        - arg: The new shape.
+
+        Returns:
+        - The expanded buffer.
+        """
         return LazyBuffer(np.broadcast_to(self._np, arg))
 
     def shrink(self, arg):
+        """
+        Shrinks the buffer.
+
+        Parameters:
+        - arg: The new shape.
+
+        Returns:
+        - The shrunk buffer.
+        """
         return LazyBuffer(self._np[tuple(slice(p[0], p[1], None)
                                          for p in arg)])
 
     def permute(self, arg):
+        """
+        Permutes the buffer.
+
+        Parameters:
+        - arg: The permutation order.
+
+        Returns:
+        - The permuted buffer.
+        """
         return LazyBuffer(self._np.transpose(arg))
 
     def pad(self, arg):
+        """
+        Pads the buffer.
+
+        Parameters:
+        - arg: The padding configuration.
+
+        Returns:
+        - The padded buffer.
+        """
         return LazyBuffer(np.pad(self._np, arg))
 
     def stride(self, arg):
+        """
+        Applies strides to the buffer.
+
+        Parameters:
+        - arg: The stride configuration.
+
+        Returns:
+        - The strided buffer.
+        """
         return LazyBuffer(self._np[tuple(slice(None, None, i) for i in arg)])
