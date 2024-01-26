@@ -20,9 +20,6 @@ PYTHONPATH="." python mnist.py
 
 
 # Project walk through
-Sure, I can provide a high-level overview of the [`teenygrad`](command:_github.copilot.openRelativePath?%5B%22teenygrad%22%5D "teenygrad") library based on the information you've provided.
-
-[`teenygrad`](command:_github.copilot.openRelativePath?%5B%22teenygrad%22%5D "teenygrad") is a minimalistic deep learning library. It appears to be designed for simplicity and readability, rather than performance or feature completeness.
 
 Here are some key components:
 
@@ -37,5 +34,3 @@ Here are some key components:
 5. **Tests ([`test/test_optim.py`](command:_github.copilot.openRelativePath?%5B%22test%2Ftest_optim.py%22%5D "test/test_optim.py"))**: This file contains various tests for the optimization algorithms. It appears to compare the output of the [`teenygrad`](command:_github.copilot.openRelativePath?%5B%22teenygrad%22%5D "teenygrad") optimizers with those from the `torch` library to ensure they are working correctly.
 
 6. **Machine Learning Operations ([`teenygrad/mlops.py`](command:_github.copilot.openRelativePath?%5B%22teenygrad%2Fmlops.py%22%5D "teenygrad/mlops.py"))**: This file contains the implementation of various machine learning operations as classes that inherit from the `Function` class. Each class implements a [`forward`](command:_github.copilot.openSymbolInFile?%5B%22mnist.py%22%2C%22forward%22%5D "mnist.py") method for computing the output of the operation, and a [`backward`](command:_github.copilot.openSymbolInFile?%5B%22teenygrad%2Fmlops.py%22%2C%22backward%22%5D "teenygrad/mlops.py") method for computing the gradient during backpropagation.
-
-The [`teenygrad`](command:_github.copilot.openRelativePath?%5B%22teenygrad%22%5D "teenygrad") library seems to be a great resource for understanding the basics of how deep learning libraries work under the hood. It's worth noting that real-world deep learning libraries like PyTorch or TensorFlow are much more complex and optimized, but the basic principles are the same.

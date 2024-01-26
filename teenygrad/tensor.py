@@ -15,7 +15,30 @@ from teenygrad.realize import run_schedule
 
 
 class Function:
+    """
+    Base class for defining differentiable functions in TeenyGrad.
 
+    Args:
+        device (str): The device on which the function will be executed.
+        *tensors (Tensor): Input tensors to the function.
+
+    Attributes:
+        device (str): The device on which the function will be executed.
+        needs_input_grad (list): A list indicating whether each input tensor requires gradient computation.
+        requires_grad (bool): Indicates whether the function output requires gradient computation.
+        parents (tuple): The input tensors to the function, if requires_grad is True.
+
+    Methods:
+        forward(*args, **kwargs): Computes the forward pass of the function.
+        backward(*args, **kwargs): Computes the backward pass of the function.
+
+    Class Methods:
+        apply(fxn, *x, **kwargs): Applies the function to the input tensors and returns the result.
+
+    Raises:
+        NotImplementedError: If the forward method is not implemented for the specific function.
+        RuntimeError: If the backward method is not implemented for the specific function.
+    """
     def __init__(self, device: str, *tensors: Tensor):
         self.device = device
         self.needs_input_grad = [t.requires_grad for t in tensors]
@@ -47,6 +70,69 @@ import teenygrad.mlops as mlops
 
 
 class Tensor:
+    '''
+    1. Mathematical Operations:
+       - add()
+       - sub()
+       - mul()
+       - div()
+       - pow()
+       - matmul()
+       - maximum()
+       - minimum()
+       - where()
+
+    2. Operator Overloading:
+       - __neg__()
+       - __add__()
+       - __sub__()
+       - __mul__()
+       - __pow__()
+       - __truediv__()
+       - __matmul__()
+       - __radd__()
+       - __rsub__()
+       - __rmul__()
+       - __rpow__()
+       - __rtruediv__()
+       - __rmatmul__()
+       - __iadd__()
+       - __isub__()
+       - __imul__()
+       - __ipow__()
+       - __itruediv__()
+       - __imatmul__()
+       - __lt__()
+       - __gt__()
+       - __ge__()
+       - __le__()
+       - __ne__()
+       - __eq__()
+
+    3. Functional NN Operations:
+       - linear()
+       - sequential()
+       - layernorm()
+       - batchnorm()
+       - dropout()
+       - scaled_dot_product_attention()
+       - binary_crossentropy()
+       - binary_crossentropy_logits()
+       - sparse_categorical_crossentropy()
+
+    4. Cast Operations:
+       - cast()
+       - bitcast()
+       - float()
+       - half()
+
+    5. Convenience Functions:
+       - ndim
+       - numel()
+       - element_size()
+       - nbytes()
+       - is_floating_point()
+    '''
     __slots__ = "lazydata", "requires_grad", "grad", "_ctx"
     __deletable__ = ('_ctx', )
     training: ClassVar[bool] = False

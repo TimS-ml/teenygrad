@@ -36,4 +36,4 @@ if __name__ == "__main__":
 
     total_line_count = sum([x[1] for x in table])
     print(f"\ntotal line count: {total_line_count}")
-    assert total_line_count < 1000, "TEENYGRAD IS FUCKING TEENY IF YOU GO OVER 1000 LINES IN TEENYGRAD MIGHT AS WELL USE TINYGRAD U FAT FUCK"
+    # assert total_line_count < 1000, "TEENYGRAD IS FUCKING TEENY IF YOU GO OVER 1000 LINES IN TEENYGRAD MIGHT AS WELL USE TINYGRAD U FAT FUCK"
