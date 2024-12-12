@@ -5,8 +5,28 @@ from teenygrad.tensor import Tensor
 
 
 class Optimizer:
+    """
+    Base optimizer class.
+
+    Attributes:
+    - params: List of tensors to optimize
+    - device: Device where the optimization is performed
+    - buffers: List of non-trainable tensors
+    - lr: Learning rate tensor
+
+    Methods:
+    - zero_grad(): Zeros out the gradients of all parameters
+    - realize(): Realizes the parameters and buffers
+    """
 
     def __init__(self, params: List[Tensor], lr: float):
+        """
+        Initialize the optimizer.
+
+        Parameters:
+        - params: List of tensors to optimize
+        - lr: Learning rate
+        """
         # if it's None, but being put into an optimizer, set it to True
         for x in params:
             if x.requires_grad is None: x.requires_grad = True
@@ -33,6 +53,18 @@ class Optimizer:
 
 
 class SGD(Optimizer):
+    """
+    Stochastic Gradient Descent optimizer with momentum.
+
+    Attributes:
+    - momentum: Momentum factor
+    - wd: Weight decay
+    - nesterov: Whether to use Nesterov momentum
+    - b: Momentum buffers
+
+    Methods:
+    - step(): Performs a single optimization step
+    """
 
     def __init__(self,
                  params: List[Tensor],
@@ -40,6 +72,16 @@ class SGD(Optimizer):
                  momentum=0,
                  weight_decay=0.0,
                  nesterov=False):
+        """
+        Initialize the SGD optimizer.
+
+        Parameters:
+        - params: List of tensors to optimize
+        - lr: Learning rate (default: 0.001)
+        - momentum: Momentum factor (default: 0)
+        - weight_decay: Weight decay factor (default: 0.0)
+        - nesterov: Whether to use Nesterov momentum (default: False)
+        """
         super().__init__(params, lr)
         self.momentum, self.wd, self.nesterov = momentum, weight_decay, nesterov
         self.b = [
@@ -71,6 +113,23 @@ def Adam(params: List[Tensor], lr=0.001, b1=0.9, b2=0.999, eps=1e-8):
 
 
 class LAMB(Optimizer):
+    """
+    LAMB (Layer-wise Adaptive Moments optimizer for Batch training) optimizer.
+    Can also behave as Adam/AdamW when adam=True.
+
+    Attributes:
+    - b1: First moment decay rate
+    - b2: Second moment decay rate
+    - eps: Small constant for numerical stability
+    - wd: Weight decay
+    - adam: Whether to run in Adam mode
+    - t: Step counter
+    - m: First moment buffers
+    - v: Second moment buffers
+
+    Methods:
+    - step(): Performs a single optimization step
+    """
 
     def __init__(self,
                  params: List[Tensor],
@@ -80,6 +139,18 @@ class LAMB(Optimizer):
                  eps=1e-6,
                  wd=0.0,
                  adam=False):
+        """
+        Initialize the LAMB optimizer.
+
+        Parameters:
+        - params: List of tensors to optimize
+        - lr: Learning rate (default: 0.001)
+        - b1: First moment decay rate (default: 0.9)
+        - b2: Second moment decay rate (default: 0.999)
+        - eps: Small constant for numerical stability (default: 1e-6)
+        - wd: Weight decay (default: 0.0)
+        - adam: Whether to run in Adam mode (default: False)
+        """
         super().__init__(params, lr)
         self.b1, self.b2, self.eps, self.wd, self.adam, self.t = b1, b2, eps, wd, adam, Tensor(
             [0], requires_grad=False).realize()
