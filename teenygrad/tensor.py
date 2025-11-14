@@ -157,6 +157,31 @@ class Tensor:
                  device: Optional[str] = None,
                  dtype: Optional[DType] = None,
                  requires_grad: Optional[bool] = None):
+        """
+        Initialize a Tensor object.
+
+        A Tensor is the fundamental data structure in TeenyGrad, representing a multi-dimensional
+        array with automatic differentiation support. It wraps a LazyBuffer for deferred computation.
+
+        Args:
+            data: Input data which can be:
+                  - None: Creates an empty tensor
+                  - int/float: Creates a scalar tensor
+                  - list: Creates a tensor from Python list
+                  - LazyBuffer: Wraps an existing lazy buffer
+                  - np.ndarray: Creates a tensor from numpy array
+                  - bytes: Creates a uint8 tensor from raw bytes
+            device: Target device for computation (e.g., 'CPU', 'GPU'). Defaults to CPU.
+            dtype: Data type (e.g., float32, int32). Defaults to Tensor.default_type.
+            requires_grad: Whether to track gradients for this tensor. Three states:
+                          - True: Always track gradients
+                          - False: Never track gradients
+                          - None: Will be set to True if used in an optimizer
+
+        Raises:
+            AssertionError: If dtype is invalid or doesn't match data dtype
+            RuntimeError: If data type cannot be converted to Tensor
+        """
         assert dtype is None or isinstance(dtype,
                                            DType), f"invalid dtype {dtype}"
         device = Device.canonicalize(device)
@@ -222,6 +247,19 @@ class Tensor:
 
     @staticmethod
     def corealize(lst: Iterable[Tensor]):
+        """
+        Realize multiple tensors together efficiently.
+
+        This method schedules and executes the computation graph for multiple tensors
+        at once, allowing for better optimization and shared computation.
+
+        Args:
+            lst: An iterable of Tensor objects to realize
+
+        Note:
+            This is more efficient than calling realize() on each tensor individually
+            as it can optimize across all tensors and avoid redundant computations.
+        """
         seen: Set[LazyBuffer] = set()
         sched = []
         for t in lst:
@@ -229,10 +267,42 @@ class Tensor:
         run_schedule(sched)
 
     def realize(self) -> Tensor:
+        """
+        Force evaluation of the lazy computation graph for this tensor.
+
+        Converts the lazy representation into an actual computed buffer in memory.
+        After realization, the tensor data is materialized and accessible.
+
+        Returns:
+            self: The tensor with realized (computed) data
+
+        Note:
+            TeenyGrad uses lazy evaluation by default. Operations build a computation
+            graph without executing. This method forces immediate execution.
+        """
         run_schedule(self.lazydata.schedule())
         return self
 
     def assign(self, x) -> Tensor:
+        """
+        In-place assignment of tensor values.
+
+        Replaces the data in this tensor with data from x, maintaining the same
+        tensor object reference. This is used for in-place operations like +=, -=, etc.
+
+        Args:
+            x: Source data (Tensor or value convertible to Tensor)
+
+        Returns:
+            self: The modified tensor
+
+        Raises:
+            AssertionError: If shapes don't match, devices don't match, or x requires gradient
+
+        Note:
+            This operation is in-place and modifies the tensor. If the tensor is already
+            realized, this may optimize by using it as an output buffer.
+        """
         # TODO: this is a hack for writing to DISK
         if self.device.startswith("DISK"):
             if x.__class__ is not Tensor:
@@ -251,9 +321,37 @@ class Tensor:
         return self
 
     def detach(self) -> Tensor:
+        """
+        Create a new tensor detached from the computation graph.
+
+        Returns a new tensor with the same data but with requires_grad=False.
+        The returned tensor will not track gradients or participate in backpropagation.
+
+        Returns:
+            Tensor: New tensor with same data but no gradient tracking
+
+        Note:
+            Useful when you want to use tensor values without affecting the gradient computation.
+        """
         return Tensor(self.lazydata, device=self.device, requires_grad=False)
 
     def numpy(self) -> np.ndarray:
+        """
+        Convert tensor to numpy array.
+
+        Realizes the tensor, moves it to CPU, and converts to a numpy ndarray.
+        This materializes the lazy computation graph and copies data to CPU memory.
+
+        Returns:
+            np.ndarray: Numpy array with the tensor's data
+
+        Raises:
+            AssertionError: If shape is symbolic or dtype has no numpy equivalent
+
+        Note:
+            This operation forces realization and may be slow for large tensors
+            or tensors on non-CPU devices.
+        """
         assert all_int(
             self.shape), f"no numpy if shape is symbolic, {self.shape=}"
         assert self.dtype.np is not None, f"no numpy dtype for {self.dtype}"
@@ -262,6 +360,20 @@ class Tensor:
                 'CPU').realize().lazydata.realized.toCPU().reshape(self.shape)
 
     def item(self) -> Union[float, int]:
+        """
+        Extract scalar value from a tensor.
+
+        Returns the single value from a tensor containing exactly one element.
+
+        Returns:
+            float or int: The scalar value
+
+        Raises:
+            ValueError: If tensor contains more than one element
+
+        Note:
+            Tensor must have exactly one element (scalar or shape (1,) etc.)
+        """
         return self.numpy().item()
 
     def to(self, device: Optional[str]) -> Tensor:
@@ -427,6 +539,30 @@ class Tensor:
         return _deepwalk(self, set(), [])
 
     def backward(self) -> Tensor:
+        """
+        Compute gradients via backpropagation through the computation graph.
+
+        This implements reverse-mode automatic differentiation. It walks the computation
+        graph in reverse topological order and applies the chain rule to compute gradients.
+
+        Returns:
+            self: The tensor (for chaining)
+
+        Raises:
+            AssertionError: If tensor is not a scalar (must have empty shape tuple)
+
+        Algorithm:
+            1. Initialize this tensor's gradient to 1 (scalar gradient)
+            2. Topologically sort the computation graph using deepwalk()
+            3. Traverse in reverse order (from output to inputs)
+            4. For each node, call its backward() function with its gradient
+            5. Accumulate gradients in parent tensors
+
+        Note:
+            - Only scalar tensors can call backward() (loss values)
+            - Gradients are accumulated in the .grad attribute of each tensor
+            - Tensors with requires_grad=True will have gradients computed
+        """
         assert self.shape == tuple(
         ), f"backward can only be called for scalar tensors, but it has shape {self.shape})"
 
@@ -452,6 +588,23 @@ class Tensor:
     # ***** movement mlops *****
 
     def reshape(self, shape, *args) -> Tensor:
+        """
+        Change the shape of the tensor without changing its data.
+
+        Returns a view of the tensor with a new shape. The total number of
+        elements must remain the same. Supports -1 for automatic dimension inference.
+
+        Args:
+            shape: New shape as tuple or individual arguments
+            *args: Additional shape dimensions if not using tuple
+
+        Returns:
+            Tensor: Reshaped view of the tensor
+
+        Examples:
+            x.reshape(2, 3, 4)  # Explicit shape
+            x.reshape((2, -1))  # -1 infers the dimension (here: total_elements / 2)
+        """
         new_shape = argfix(shape, *args)
         return mlops.Reshape.apply(
             self,
@@ -462,6 +615,23 @@ class Tensor:
             ]))
 
     def expand(self, shape, *args) -> Tensor:
+        """
+        Broadcast tensor to a new shape by repeating along singleton dimensions.
+
+        Creates a view where dimensions of size 1 are repeated to match the target shape.
+        No data is copied; this is a memory-efficient broadcast operation.
+
+        Args:
+            shape: Target shape as tuple or individual arguments
+            *args: Additional shape dimensions if not using tuple
+
+        Returns:
+            Tensor: Expanded view of the tensor
+
+        Note:
+            Only dimensions of size 1 can be expanded. Other dimensions must match.
+            Example: (1, 3) can expand to (5, 3) but not to (5, 4)
+        """
         return mlops.Expand.apply(
             self,
             shape=tuple([
@@ -470,6 +640,22 @@ class Tensor:
             ]))
 
     def permute(self, order, *args) -> Tensor:
+        """
+        Permute (transpose) the dimensions of the tensor.
+
+        Rearranges dimensions according to the specified order.
+
+        Args:
+            order: New dimension order as tuple or individual arguments
+            *args: Additional order indices if not using tuple
+
+        Returns:
+            Tensor: Permuted view of the tensor
+
+        Example:
+            x.shape = (2, 3, 4)
+            x.permute(2, 0, 1).shape = (4, 2, 3)  # Move last dim to first
+        """
         return mlops.Permute.apply(self, order=argfix(order, *args))
 
     def flip(self, axis, *args) -> Tensor:

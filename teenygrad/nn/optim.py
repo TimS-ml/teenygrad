@@ -1,4 +1,50 @@
+"""
+Optimizers for Training Neural Networks in TeenyGrad
+
+This module implements various optimization algorithms used for training neural networks.
+Optimizers update model parameters based on computed gradients to minimize the loss function.
+
+Implemented Optimizers:
+-----------------------
+1. SGD (Stochastic Gradient Descent):
+   - Basic gradient descent with optional momentum
+   - Momentum accelerates convergence by accumulating gradient history
+   - Nesterov momentum looks ahead before computing gradients
+   - Weight decay adds L2 regularization
+
+2. Adam (Adaptive Moment Estimation):
+   - Maintains adaptive learning rates for each parameter
+   - First moment (mean) and second moment (variance) of gradients
+   - Bias correction for moment estimates
+   - Very popular for deep learning
+
+3. AdamW (Adam with Decoupled Weight Decay):
+   - Fixes weight decay implementation in Adam
+   - Weight decay applied directly to parameters, not gradients
+
+4. LAMB (Layer-wise Adaptive Moments for Batch training):
+   - Designed for large batch training
+   - Adds trust ratio based on layer-wise norm ratios
+   - Can behave as Adam when trust ratio disabled
+
+Typical Usage:
+--------------
+    # Create model and define parameters
+    model = MyModel()
+    params = [layer.weight, layer.bias for layer in model.layers]
+
+    # Initialize optimizer
+    opt = SGD(params, lr=0.01, momentum=0.9)
+
+    # Training loop
+    for batch in data:
+        opt.zero_grad()          # Clear previous gradients
+        loss = compute_loss()     # Forward pass
+        loss.backward()           # Compute gradients
+        opt.step()                # Update parameters
+
 # sorted in order of increasing complexity
+"""
 from typing import List
 from teenygrad.helpers import dedup
 from teenygrad.tensor import Tensor
@@ -42,10 +88,26 @@ class Optimizer:
                          device=self.device).contiguous()
 
     def zero_grad(self):
+        """
+        Zero out all parameter gradients.
+
+        This should be called before each backward pass to clear accumulated gradients
+        from the previous iteration. Gradients accumulate by default in TeenyGrad.
+        """
         for param in self.params:
             param.grad = None
 
     def realize(self, extra=None):
+        """
+        Force realization of all parameters, buffers, and optional extra tensors.
+
+        This ensures all lazy computations are executed and values are materialized
+        in memory. Called automatically by step() in optimizers to ensure updates
+        are applied before the next iteration.
+
+        Args:
+            extra: Optional list of additional tensors to realize
+        """
         # NOTE: in extra is too late for most of the params due to issues with assign
         Tensor.corealize(extra + self.params +
                          self.buffers if extra is not None else self.params +
@@ -91,14 +153,41 @@ class SGD(Optimizer):
 
     # https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
     def step(self) -> None:
+        """
+        Perform a single optimization step (parameter update).
+
+        SGD Update Rules:
+        -----------------
+        Without momentum:
+            θ = θ - lr * (∇L + wd * θ)
+
+        With momentum:
+            v = momentum * v + (∇L + wd * θ)
+            θ = θ - lr * v
+
+        With Nesterov momentum:
+            v = momentum * v + (∇L + wd * θ)
+            θ = θ - lr * (∇L + momentum * v)
+
+        Where:
+        - θ: parameter
+        - ∇L: gradient of loss w.r.t. parameter
+        - lr: learning rate
+        - wd: weight decay
+        - v: velocity (momentum buffer)
+        """
         for i, t in enumerate(self.params):
             assert t.grad is not None
+            # Gradient with weight decay (L2 regularization)
             g = t.grad.realize() + self.wd * t.detach()
             if self.momentum:
+                # Update momentum buffer: v = momentum * v + g
                 self.b[i].assign(self.momentum * self.b[i] + g).realize(
                 )  # NOTE: self.b[i] is zero on the first run, no if required
+                # Nesterov: use (g + momentum * v), else: use v
                 g = (g +
                      self.momentum * self.b[i]) if self.nesterov else self.b[i]
+            # Update parameter: θ = θ - lr * g
             t.assign(t.detach() - g * self.lr)
         self.realize(self.b)
 
@@ -164,23 +253,66 @@ class LAMB(Optimizer):
         ]
 
     def step(self) -> None:
+        """
+        Perform a single optimization step (parameter update).
+
+        LAMB/Adam Update Rules:
+        -----------------------
+        1. Update biased moment estimates:
+           m = β₁ * m + (1 - β₁) * g        (first moment, mean)
+           v = β₂ * v + (1 - β₂) * g²       (second moment, variance)
+
+        2. Bias correction:
+           m_hat = m / (1 - β₁^t)
+           v_hat = v / (1 - β₂^t)
+
+        3. Compute update:
+           up = m_hat / (√v_hat + ε) + wd * θ
+
+        4. LAMB trust ratio (skip if adam=True):
+           r = ||θ|| / ||up||  (layer-wise scaling)
+
+        5. Update parameter:
+           θ = θ - lr * r * up
+
+        Where:
+        - g: gradient
+        - m, v: moment estimates
+        - β₁, β₂: moment decay rates
+        - t: timestep
+        - ε: numerical stability constant
+        - wd: weight decay
+        - r: trust ratio (LAMB only)
+        """
+        # Increment timestep
         self.t.assign(self.t + 1).realize()
         for i, t in enumerate(self.params):
             assert t.grad is not None
             g = t.grad.realize()
+
+            # Update biased first moment estimate: m = β₁ * m + (1 - β₁) * g
             self.m[i].assign(self.b1 * self.m[i] +
                              (1.0 - self.b1) * g).realize()
+            # Update biased second moment estimate: v = β₂ * v + (1 - β₂) * g²
             self.v[i].assign(self.b2 * self.v[i] + (1.0 - self.b2) *
                              (g * g)).realize()
+
+            # Bias-corrected moment estimates
             m_hat = self.m[i] / (1.0 - self.b1**self.t)
             v_hat = self.v[i] / (1.0 - self.b2**self.t)
+
+            # Compute adaptive update direction
             up = (m_hat / (v_hat.sqrt() + self.eps)) + self.wd * t.detach()
+
+            # LAMB: compute trust ratio for layer-wise adaptation
             if not self.adam:
-                r1 = t.detach().square().sum().sqrt()
-                r2 = up.square().sum().sqrt()
+                r1 = t.detach().square().sum().sqrt()  # ||θ||
+                r2 = up.square().sum().sqrt()          # ||up||
                 r = Tensor.where(r1 > 0, Tensor.where(r2 > 0, r1 / r2, 1.0),
                                  1.0)
             else:
-                r = 1.0
+                r = 1.0  # Adam: no trust ratio
+
+            # Update parameter: θ = θ - lr * r * up
             t.assign(t.detach() - self.lr * r * up)
         self.realize([self.t] + self.m + self.v)

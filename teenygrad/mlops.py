@@ -77,6 +77,14 @@ class Cast(Function):
 
 
 class Zero(Function):
+    """
+    Zero operation - replaces tensor with zeros.
+
+    Forward: Returns a tensor of zeros with the same shape as input.
+    Backward: Returns zeros (gradient is zero since output doesn't depend on input).
+
+    This is used for optimization: multiplication by 0 can be replaced with this operation.
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
         return x.const(0)
@@ -86,6 +94,14 @@ class Zero(Function):
 
 
 class Neg(Function):
+    """
+    Negation operation - computes -x.
+
+    Forward: y = -x
+    Backward: ∂L/∂x = -∂L/∂y
+
+    The gradient of negation is simply the negation of the upstream gradient.
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
         return x.e(UnaryOps.NEG)
@@ -95,12 +111,22 @@ class Neg(Function):
 
 
 class Sin(Function):
+    """
+    Sine operation - computes sin(x).
+
+    Forward: y = sin(x)
+    Backward: ∂L/∂x = cos(x) * ∂L/∂y
+
+    The derivative of sin(x) is cos(x).
+    We compute cos(x) as sin(π/2 - x) to reuse the sin operation.
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
         self.x = x
         return x.e(UnaryOps.SIN)
 
     def backward(self, grad: LazyBuffer) -> LazyBuffer:
+        # cos(x) = sin(π/2 - x)
         return self.x.const(math.pi / 2).e(BinaryOps.SUB,
                                            self.x).e(UnaryOps.SIN).e(
                                                BinaryOps.MUL, grad)
@@ -108,44 +134,87 @@ class Sin(Function):
 
 # NOTE: maximum(x, 0) behaves differently where x=0
 class Relu(Function):
+    """
+    ReLU (Rectified Linear Unit) activation - computes max(x, 0).
+
+    Forward: y = max(x, 0) = x if x > 0 else 0
+    Backward: ∂L/∂x = ∂L/∂y if x > 0 else 0
+
+    ReLU is a popular activation function that introduces non-linearity.
+    Gradient is 1 where input is positive, 0 otherwise.
+
+    Note: The gradient at x=0 is technically undefined but is treated as 0 here.
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
         self.ret = x.e(BinaryOps.MAX, x.const(0))
         return self.ret
 
     def backward(self, grad_output: LazyBuffer) -> LazyBuffer:
+        # Gradient is 1 where ret > 0, else 0
         return self.ret.const(0).e(BinaryOps.CMPLT,
                                    self.ret).e(BinaryOps.MUL, grad_output)
 
 
 class Log(Function):
+    """
+    Natural logarithm operation - computes ln(x).
+
+    Forward: y = ln(x)
+    Backward: ∂L/∂x = (1/x) * ∂L/∂y
+
+    Implemented using log base 2: ln(x) = log₂(x) * ln(2)
+    The derivative of ln(x) is 1/x.
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
         self.x = x
+        # ln(x) = log₂(x) * ln(2)
         return x.e(UnaryOps.LOG2).e(BinaryOps.MUL, x.const(math.log(2)))
 
     def backward(self, grad_output: LazyBuffer) -> LazyBuffer:
+        # d/dx[ln(x)] = 1/x
         return grad_output.e(BinaryOps.DIV, self.x)
 
 
 class Exp(Function):
+    """
+    Exponential operation - computes e^x.
+
+    Forward: y = e^x
+    Backward: ∂L/∂x = e^x * ∂L/∂y
+
+    Implemented using exp base 2: e^x = 2^(x/ln(2))
+    The derivative of e^x is e^x (the function is its own derivative).
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
+        # e^x = 2^(x / ln(2))
         self.ret = x.e(BinaryOps.MUL,
                        x.const(1 / math.log(2))).e(UnaryOps.EXP2)
         return self.ret
 
     def backward(self, grad_output: LazyBuffer) -> LazyBuffer:
+        # d/dx[e^x] = e^x
         return self.ret.e(BinaryOps.MUL, grad_output)
 
 
 class Sqrt(Function):
+    """
+    Square root operation - computes √x.
+
+    Forward: y = √x = x^(1/2)
+    Backward: ∂L/∂x = (1/(2√x)) * ∂L/∂y
+
+    The derivative of √x is 1/(2√x).
+    """
 
     def forward(self, x: LazyBuffer) -> LazyBuffer:
         self.ret = x.e(UnaryOps.SQRT)
         return self.ret
 
     def backward(self, grad_output: LazyBuffer) -> LazyBuffer:
+        # d/dx[√x] = 1/(2√x) = 1/(2*ret)
         return grad_output.e(BinaryOps.DIV,
                              self.ret.e(BinaryOps.MUL, self.ret.const(2)))
 

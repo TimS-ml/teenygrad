@@ -1,9 +1,42 @@
+"""
+Helper Utilities and Data Type System for TeenyGrad
+
+This module provides essential utility functions and the data type system used
+throughout TeenyGrad. It includes:
+
+1. Utility Functions:
+   - String/list manipulation: dedup, flatten
+   - Argument processing: argfix, make_pair
+   - Numeric utilities: argsort, all_int, round_up
+   - Environment variables: getenv, DEBUG, CI
+
+2. Data Type System (DType and dtypes):
+   - Unified data type representation across backends
+   - Support for standard types: float16/32/64, int8/16/32/64, uint8/16/32/64, bool
+   - Type conversion between numpy and internal representations
+   - Type checking utilities: is_int, is_float, is_unsigned
+
+3. Special Data Types:
+   - ImageDType: For image-specific tensor representations
+   - PtrDType: For pointer/memory address types
+
+The data type system is crucial for:
+- Cross-backend compatibility (CPU, GPU, etc.)
+- Type promotion rules in mixed-type operations
+- Memory layout and size calculations
+- Kernel generation and optimization
+
+Environment Variables:
+- DEBUG: Controls debug output level (0=none, higher=more verbose)
+- CI: Set in continuous integration environments
+"""
 from typing import Union, Tuple, Iterator, Optional, Final, Any
 import os, functools, platform
 import numpy as np
 from math import prod  # noqa: F401 # pylint:disable=unused-import
 from dataclasses import dataclass
 
+# Platform detection for OS-specific behavior
 OSX = platform.system() == "Darwin"
 
 

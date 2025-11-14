@@ -1,3 +1,38 @@
+"""
+Lazy Buffer Implementation for TeenyGrad
+
+This module implements lazy evaluation for tensor operations in TeenyGrad.
+Lazy evaluation means that operations are not executed immediately when called,
+but instead build up a computation graph that can be optimized and executed later.
+
+Key Concepts:
+-------------
+1. LazyBuffer: The core abstraction that wraps tensor data and operations.
+   - Stores the computation graph instead of immediate results
+   - Operations return new LazyBuffers that reference the graph
+   - Actual computation happens only when .schedule() and realize() are called
+
+2. RawCPUBuffer: A simple wrapper around numpy arrays for realized (computed) data.
+
+Benefits of Lazy Evaluation:
+-----------------------------
+- Operation Fusion: Multiple operations can be combined into single kernels
+- Memory Optimization: Intermediate results can be avoided
+- Graph Optimization: The computation graph can be optimized before execution
+- Device Flexibility: Operations can be scheduled optimally across devices
+
+Example Flow:
+-------------
+1. User creates tensors and performs operations: z = (x + y) * 2
+2. Each operation creates a LazyBuffer node in the graph
+3. When z.realize() is called:
+   - schedule() walks the graph and creates an execution plan
+   - run_schedule() executes the plan
+   - The result is materialized into actual memory
+
+Note: In this minimal implementation, operations are executed eagerly using numpy,
+but the structure supports true lazy evaluation in a full implementation.
+"""
 from __future__ import annotations
 from teenygrad.helpers import DType, dtypes, DEBUG
 from teenygrad.ops import UnaryOps, BinaryOps, ReduceOps, TernaryOps, LoadOps
